@@ -24,6 +24,9 @@
     <ClInclude Include="ir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ConerladSignController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ir.cpp">

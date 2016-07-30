@@ -3,29 +3,39 @@
 #include <SD.h>
 
 #include <pcmConfig.h>
-#include "ir.h"
-#include <IRremoteInt.h>
-#include <IRremote.h>
-
-const int irReceiverPin = 11;
-const int sdCardPin = 4;
-const int audioOutPin = 9;
-
-IRrecv irReceiver(irReceiverPin);
-decode_results irResults;
+#include "ConerladSignController.h"
+#include <SPI.h>
 
 TMRpcm audioPlayer;
+SignState state = Idle;
+RemoteState remoteState;
+RemoteState lastRemoteState;
 
 void setup()
 {
 	Serial.begin(9600);
-	SetupIR();
+	Serial.println("Init");
+	SetupPins();
 	SetupAudioPlayer();
+	state = BlinkRed;
+}
+
+void SetupPins()
+{
+	pinMode(whiteLightPin, OUTPUT);
+	pinMode(redLightPin, OUTPUT);
+	
+	pinMode(aRfButtonPin, INPUT_PULLUP);
+	pinMode(bRfButtonPin, INPUT_PULLUP);
+	pinMode(cRfButtonPin, INPUT_PULLUP);
+	pinMode(dRfButtonPin, INPUT_PULLUP);
 }
 
 void loop()
 {
-	IrLoop();
+	GetRemoteState();
+	RemoteStateLoop();
+	StateLoop();
 }
 
 void SetupAudioPlayer()
@@ -37,33 +47,93 @@ void SetupAudioPlayer()
 		return;
 	}
 
-	audioPlayer.setVolume(6);
+	audioPlayer.setVolume(5);
 }
 
-void SetupIR()
+void GetRemoteState()
 {
-	irReceiver.enableIRIn(); // Start the receiver
-}
-
-void IrLoop()
-{
-
-	if (irReceiver.decode(&irResults))
+	if (digitalRead(aRfButtonPin) == ACTIVE)
 	{
-		#ifdef DEBUG
-		Serial.println(IR::Codes::CodeName(irResults.value));
-		Serial.println(irResults.value, HEX);
-		#endif
-
-		switch (irResults.value)
-		{
-			using namespace IR::Codes;
-
-			case one:
-				audioPlayer.play("test.wav");
-				break;
-		}
-
-		irReceiver.resume(); // Receive the next value
+		remoteState = A;
+		return;
 	}
+
+	if (digitalRead(bRfButtonPin) == ACTIVE)
+	{
+		remoteState = B;
+		return;
+	}
+
+	if (digitalRead(cRfButtonPin) == ACTIVE)
+	{
+		remoteState = C;
+		return;
+	}
+
+	if (digitalRead(dRfButtonPin) == ACTIVE)
+	{
+		remoteState = D;
+		return;
+	}
+}
+
+void RemoteStateLoop()
+{
+	if (remoteState == lastRemoteState) return;
+
+	switch (remoteState)
+	{
+		case A:
+			audioPlayer.stopPlayback();
+			Serial.println("A Selected");
+			TurnLightOff(Red);
+			TurnLightOn(White);
+			state = Idle;
+		break;
+
+		case B:
+			Serial.println("B Selected");
+			TurnLightOff(White);
+			audioPlayer.play("test.wav");
+			state = BlinkRed;
+			break;
+
+		case C:
+			Serial.println("C Selected");
+			break;
+
+		case D:
+			Serial.println("D Selected");
+			break;
+	}
+
+	lastRemoteState = remoteState;
+}
+
+void StateLoop()
+{
+	switch (state)
+	{
+		case BlinkRed:
+			BlinkLight(Red, blinkRate);
+		return;
+	}
+}
+
+void TurnLightOn(LightColor light)
+{
+	digitalWrite((int)light, HIGH);
+}
+
+void TurnLightOff(LightColor light)
+{
+	digitalWrite((int)light, LOW);
+}
+
+void BlinkLight(LightColor light, unsigned long rate)
+{
+	TurnLightOn(light);
+	delay(rate);
+	TurnLightOff(light);
+	delay(rate);
 }
